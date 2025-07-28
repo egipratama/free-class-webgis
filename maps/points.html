@@ -1,0 +1,112 @@
+<html lang="en">
+  <head>
+    <title>Display Points in MAPID Maps</title>
+    <meta
+      property="og:description"
+      content="Use extrusions to display buildings' height in 3D."
+    />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css"
+    />
+    <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body,
+      #map {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      const MAP_SERVICE_KEY = "67acaad1aeee190e01e20459";
+      const map = new maplibregl.Map({
+        style: `https://basemap.mapid.io/styles/street-new-generation/style.json?key=${MAP_SERVICE_KEY}`,
+        center: [107.5511406042192, -6.97388872747139],
+        zoom: 16,
+        pitch: 0,
+        bearing: 0,
+        container: "map",
+        canvasContextAttributes: { antialias: true },
+        attributionControl: true,
+      });
+
+      // GeoJSON data dengan beberapa titik
+      var geojsonData = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {
+              Nama: "Kantor MAPID Bandung",
+            },
+            geometry: {
+              coordinates: [107.5511406042192, -6.97388872747139],
+              type: "Point",
+            },
+            id: 0,
+          },
+          {
+            type: "Feature",
+            properties: {
+              Nama: "Mess MAPID",
+            },
+            geometry: {
+              coordinates: [107.55176459265863, -6.973027194314895],
+              type: "Point",
+            },
+            id: 1,
+          },
+        ],
+      };
+
+      map.on("load", () => {
+        console.log("map loaded");
+
+        map.addSource("points", {
+          type: "geojson",
+          data: geojsonData,
+        });
+
+        // Tambahkan layer untuk menampilkan titik
+        map.addLayer({
+          id: "points-layer",
+          type: "circle",
+          source: "points",
+          paint: {
+            "circle-radius": 8, // Ukuran titik
+            "circle-color": "#ff0000", // Warna merah
+          },
+        });
+
+        // Event klik pada titik untuk menampilkan popup
+        map.on("click", "points-layer", function (e) {
+          var coordinates = e.features[0].geometry.coordinates.slice();
+          var title = e.features[0].properties.Nama;
+
+          new maplibregl.Popup()
+            .setLngLat(coordinates)
+            .setHTML(`<b>${title}</b>`)
+            .addTo(map);
+        });
+
+        // Ubah cursor saat mengarah ke titik
+        map.on("mouseenter", "points-layer", function () {
+          map.getCanvas().style.cursor = "pointer";
+        });
+
+        map.on("mouseleave", "points-layer", function () {
+          map.getCanvas().style.cursor = "";
+        });
+      });
+    </script>
+  </body>
+</html>

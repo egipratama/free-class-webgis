@@ -1,0 +1,95 @@
+<html lang="en">
+  <head>
+    <title>Display Polygon in MAPID Maps</title>
+    <meta
+      property="og:description"
+      content="Use extrusions to display buildings' height in 3D."
+    />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css"
+    />
+    <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body,
+      #map {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      const MAP_SERVICE_KEY = "67acaad1aeee190e01e20459"; // ganti dengan API key Anda yang didapat dari menu map services di geo.mapid.io
+      const map = new maplibregl.Map({
+        style: `https://basemap.mapid.io/styles/street-new-generation/style.json?key=${MAP_SERVICE_KEY}`,
+        center: [106.82710337943456, -6.175386689960263],
+        zoom: 15,
+        pitch: 0,
+        bearing: 0,
+        container: "map",
+        canvasContextAttributes: { antialias: true },
+        attributionControl: true, // attribution control wajib ada sebagai syarat penggunaan mapid maps
+      });
+
+      var geojsonPolygon = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              coordinates: [
+                [
+                  [106.8232437512296, -6.1714824178734915],
+                  [106.82294037433962, -6.180396851020518],
+                  [106.830996716183, -6.180162262598145],
+                  [106.83177201267807, -6.1790731007013875],
+                  [106.83015400260064, -6.173493205374669],
+                  [106.82914274630298, -6.1729905092152535],
+                  [106.82921016338884, -6.171549444245784],
+                  [106.8232437512296, -6.1714824178734915],
+                ],
+              ],
+              type: "Polygon",
+            },
+          },
+        ],
+      };
+
+      map.on("load", function () {
+        map.addSource("polygon-source", {
+          type: "geojson",
+          data: geojsonPolygon,
+        });
+
+        map.addLayer({
+          id: "polygon-layer",
+          type: "fill",
+          source: "polygon-source",
+          paint: {
+            "fill-color": "red",
+            "fill-opacity": 0.5,
+          },
+        });
+
+        map.addLayer({
+          id: "polygon-outline",
+          type: "line",
+          source: "polygon-source",
+          paint: {
+            "line-color": "#000000",
+            "line-width": 2,
+          },
+        });
+      });
+    </script>
+  </body>
+</html>
