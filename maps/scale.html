@@ -1,0 +1,188 @@
+<html lang="en">
+
+<head>
+    <title>Display MAPID Maps in 3D</title>
+    <meta property="og:description" content="Use extrusions to display buildings' height in 3D." />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css" />
+    <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+        .fixed-scale {
+            background: rgba(255,255,255,0.85);
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font: 12px/1.2 sans-serif;
+        }
+        .fixed-scale .bar {
+            height: 6px;
+            width: 220px;           /* FIXED WIDTH */
+            border: 2px solid #111;
+            border-top: none;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div style="position:absolute;top:60px;left:12px;z-index:999;background:#fff;padding:8px;border-radius:6px;">
+        <label>Target scale:</label>
+        <input id="scaleInput" value="500" style="width:80px;" />
+        <select id="scaleUnit">
+            <option value="m">m</option>
+            <option value="km">km</option>
+        </select>
+        <button id="applyScale">Apply</button>
+    </div>
+    <script>
+        const MAP_SERVICE_KEY = "67acaad1aeee190e01e20459";
+        const map = new maplibregl.Map({
+            style: `https://basemap.mapid.io/styles/street-new-generation/style.json?key=${MAP_SERVICE_KEY}`,
+            center: [106.82717425766694, -6.175403054116954],
+            zoom: 15.5,
+            pitch: 0,
+            bearing: 0,
+            container: "map",
+            canvasContextAttributes: { antialias: true },
+            attributionControl: true,
+        });
+
+        map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+        // map.addControl(
+        //     new maplibregl.ScaleControl({ maxWidth: 220, unit: "metric" }),
+        //     "top-right"
+        // );
+
+        map.on("load", () => {
+            console.log("map loaded");
+        });
+    </script>
+    <script>
+        function haversineMeters(a, b) {
+            const R = 6371008.8;
+            const toRad = d => d * Math.PI / 180;
+            const dLat = toRad(b.lat - a.lat);
+            const dLng = toRad(b.lng - a.lng);
+            const lat1 = toRad(a.lat);
+            const lat2 = toRad(b.lat);
+
+            const s = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+            return 2 * R * Math.asin(Math.sqrt(s));
+        }
+
+        function formatMetric(m) {
+            if (m >= 1000) return (m/1000).toFixed(m >= 10000 ? 0 : 1) + " km";
+            return Math.round(m) + " m";
+        }
+
+        class FixedWidthScaleControl {
+            constructor({ widthPx = 220 } = {}) {
+                this.widthPx = widthPx;
+                this._onMove = this._onMove.bind(this);
+            }
+
+            onAdd(map) {
+                this.map = map;
+                this.container = document.createElement("div");
+                this.container.className = "maplibregl-ctrl maplibregl-ctrl-group fixed-scale";
+
+                this.label = document.createElement("div");
+                this.bar = document.createElement("div");
+                this.bar.className = "bar";
+                this.bar.style.width = this.widthPx + "px";
+
+                this.container.appendChild(this.label);
+                this.container.appendChild(this.bar);
+
+                this._update();
+                map.on("move", this._onMove);
+                map.on("zoom", this._onMove);
+                return this.container;
+            }
+
+            onRemove() {
+                this.map.off("move", this._onMove);
+                this.map.off("zoom", this._onMove);
+                this.container.remove();
+                this.map = undefined;
+            }
+
+            _onMove() { this._update(); }
+
+            _update() {
+                const y = this.map.getContainer().clientHeight / 2;
+                const x1 = (this.map.getContainer().clientWidth / 2) - (this.widthPx / 2);
+                const x2 = x1 + this.widthPx;
+
+                const p1 = this.map.unproject([x1, y]);
+                const p2 = this.map.unproject([x2, y]);
+
+                const meters = haversineMeters(p1, p2);
+                this.label.textContent = formatMetric(meters);
+            }
+        }
+
+        // pakai:
+        map.addControl(new FixedWidthScaleControl({ widthPx: 220 }), "top-left");
+    </script>
+    <script>
+        // Lebar bar yang kamu anggap sebagai “skala” (px)
+        const SCALE_BAR_WIDTH_PX = 220;
+
+        // Radius bumi (meter) untuk Web Mercator (WGS84)
+        const EARTH_RADIUS = 6378137;
+
+        function metersPerPixelAtLat(zoom, latDeg, tileSize = 512) {
+            const latRad = latDeg * Math.PI / 180;
+            // resolusi di ekuator: 2πR / (tileSize * 2^zoom), lalu dikali cos(lat)
+            return (Math.cos(latRad) * 2 * Math.PI * EARTH_RADIUS) / (tileSize * Math.pow(2, zoom));
+        }
+
+        function zoomForScaleMeters(targetMeters, latDeg, widthPx = SCALE_BAR_WIDTH_PX, tileSize = 512) {
+            // target meters-per-pixel agar targetMeters pas dalam widthPx
+            const targetMpp = targetMeters / widthPx;
+
+            const latRad = latDeg * Math.PI / 180;
+            const numerator = Math.cos(latRad) * 2 * Math.PI * EARTH_RADIUS;
+            const denom = tileSize * targetMpp;
+
+            // 2^zoom = numerator / denom  => zoom = log2(numerator/denom)
+            return Math.log2(numerator / denom);
+        }
+
+        function applyScale(targetMeters) {
+            const lat = map.getCenter().lat;
+            const z = zoomForScaleMeters(targetMeters, lat, SCALE_BAR_WIDTH_PX, 512);
+
+            // clamp supaya aman
+            const zClamped = Math.max(map.getMinZoom() ?? 0, Math.min(map.getMaxZoom() ?? 24, z));
+
+            map.easeTo({ zoom: zClamped, duration: 700 });
+        }
+
+        document.getElementById("applyScale").addEventListener("click", () => {
+            const val = parseFloat(document.getElementById("scaleInput").value);
+            const unit = document.getElementById("scaleUnit").value;
+
+            if (!isFinite(val) || val <= 0) return;
+
+            const meters = unit === "km" ? val * 1000 : val;
+            applyScale(meters);
+        });
+        </script>
+</body>
+
+</html>
